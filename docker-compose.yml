@@ -1,0 +1,92 @@
+version: '3.1'
+
+services:
+
+  db:
+    container_name: db
+    image: postgres:15.1-alpine
+    restart: always
+    volumes:
+      - ./setup/init_db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      POSTGRES_PASSWORD: radomdude
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U postgres -d postgres'"]
+      interval: 3s
+      timeout: 3s
+      retries: 3
+
+  adminer:
+    container_name: adminer
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+
+  publisher:
+    container_name: publisher
+    init: True
+    build: ./setup
+    read_only: False
+    volumes:
+      - ./src/:/app/src:ro
+      - shared-pipes:/app/pipes
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_USER=dataeng
+      - DB_PASS=best
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=doctor_office
+      - CLAIM_PIPE_NAME=/app/pipes/claim-pipe
+      - DIAGNOSE_PIPE_NAME=/app/pipes/diagnose-pipe
+      - PYTHON_MAIN=src/publisher.py
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ingestor:
+    container_name: ingestor
+    init: True
+    read_only: False
+    build: ./setup
+    volumes:
+      - ./src/:/app/src:ro
+      - shared-pipes:/app/pipes
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_USER=dataeng
+      - DB_PASS=best
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=doctor_office
+      - CLAIM_PIPE_NAME=/app/pipes/claim-pipe
+      - DIAGNOSE_PIPE_NAME=/app/pipes/diagnose-pipe
+      - PYTHON_MAIN=src/ingestor.py
+    depends_on:
+      db:
+        condition: service_healthy
+      publisher:
+        condition: service_started
+
+  analytics:
+    container_name: analytics
+    init: True
+    build: ./setup
+    volumes:
+      - ./src/:/app/src:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_USER=dataeng
+      - DB_PASS=best
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=doctor_office
+      - PYTHON_MAIN=src/analytics.py
+    depends_on:
+      db:
+        condition: service_healthy
+
+# Share volumes
+volumes:
+  shared-pipes:
