@@ -112,5 +112,5 @@ The `docker-compose up` will spin up:
 ## Questions
 
 For any questions feel free to contact me whenever you want by:
-* email: belmpas.theofilos@praxis-eins.de
+* email: belmpas.theofilos [at] praxis-eins.de
 
